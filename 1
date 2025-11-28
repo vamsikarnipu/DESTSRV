@@ -19,7 +19,6 @@ modules:
         - npm run build:cf
       supported-platforms: []
 
-
   - name: librarydest-app-content
     type: com.sap.application.content
     path: .
@@ -35,6 +34,7 @@ modules:
           name: librarydest
           target-path: resources/
 
+
 resources:
 
   - name: librarydest-destination-service
@@ -43,6 +43,16 @@ resources:
       service: destination
       service-plan: lite
       service-name: librarydest-destination-service
+      config:
+        init_data:
+          instance:
+            destinations:
+              - Name: ui5
+                Type: HTTP
+                URL: https://ui5.sap.com
+                ProxyType: Internet
+                Authentication: NoAuthentication
+        HTML5Runtime_enabled: true
 
   - name: librarydest-repo-host
     type: org.cloudfoundry.managed-service
@@ -55,6 +65,7 @@ resources:
     type: org.cloudfoundry.existing-service
     parameters:
       service-name: servicedest-destination
+
 
 parameters:
   deploy_mode: html5-repo
