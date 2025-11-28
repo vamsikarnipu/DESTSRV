@@ -1,0 +1,33 @@
+
+{
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "route",
+  "routes": [
+    {
+      "source": "^/resources/ui5Lib/(.*)$",
+      "target": "/resources/ui5Lib/$1",
+      "destination": "cap_srv",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/odata/v4/(.*)$",
+      "target": "/odata/v4/$1",
+      "destination": "cap_srv",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/odata/v2/(.*)$",
+      "target": "/odata/v2/$1",
+      "destination": "cap_srv",
+      "authenticationType": "none",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/(.*)$",
+      "localDir": "ui5Lib",
+      "authenticationType": "none"
+    }
+  ]
+}

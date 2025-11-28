@@ -1,0 +1,91 @@
+_schema-version: "3.3"
+ID: servicedest
+version: 1.0.1
+description: "A simple CAP project."
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+
+  # -----------------------------
+  # CAP BACKEND SERVICE
+  # -----------------------------
+  - name: servicedest-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+    build-parameters:
+      builder: npm-ci
+    provides:
+      - name: srv-api                 # export CAP URL
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: servicedest-destination # binds Destination Service instance
+
+
+  # -----------------------------
+  # OPTIONAL APP ROUTER (REMOVE if not needed)
+  # -----------------------------
+  - name: servicedest
+    type: approuter.nodejs
+    path: app/router
+    parameters:
+      keep-existing-routes: true
+      disk-quota: 256M
+      memory: 256M
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: CAP_BACKEND           # UI5 and router use this
+          url: ~{srv-url}             # CAP backend URL
+          forwardAuthToken: true
+      - name: servicedest-destination
+    provides:
+      - name: app-api
+        properties:
+          app-protocol: ${protocol}
+          app-uri: ${default-uri}
+
+
+
+resources:
+  - name: servicedest-destination
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+      - name: app-api
+    parameters:
+      service: destination
+      service-plan: lite
+      config:
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            destinations:
+
+              - Name: CAP_BACKEND
+                Type: HTTP
+                ProxyType: Internet
+                Authentication: NoAuthentication
+                URL: ~{srv-api/srv-url}
+
+              - Name: APP_ROUTER
+                Type: HTTP
+                ProxyType: Internet
+                Authentication: NoAuthentication
+                URL: ~{app-api/app-uri}
+
+            existing_destinations_policy: update
+        version: 1.0.0
