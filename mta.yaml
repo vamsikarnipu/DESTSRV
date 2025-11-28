@@ -71,7 +71,8 @@ modules:
     type: html5
     path: .
     requires:
-      - name: servicedest-destination          # <-- added
+      - name: librarydest-destination-service    # HTML5 runtime needs destination service
+      - name: librarydest-repo-host             # HTML5 apps need repo host
     build-parameters:
       build-result: dist
       builder: custom
