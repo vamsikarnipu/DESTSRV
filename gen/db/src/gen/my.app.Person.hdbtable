@@ -1,0 +1,7 @@
+COLUMN TABLE my_app_Person (
+  ID INTEGER NOT NULL,
+  name NVARCHAR(5000),
+  age INTEGER,
+  gender NVARCHAR(5000),
+  PRIMARY KEY(ID)
+)

@@ -1,0 +1,118 @@
+{
+  "_version": "1.76.0",
+  "sap.app": {
+    "id": "librarydest",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "resources": "resources.json",
+    "sourceTemplate": {
+      "id": "@sap/generator-fiori:basic",
+      "version": "1.19.5",
+      "toolsId": "6a7feb04-b257-4e20-9167-ebe9215c3a81"
+    },
+    "crossNavigation": {
+      "inbounds": {
+        "dest-show": {
+          "semanticObject": "dest",
+          "action": "show",
+          "title": "{{dest-show.flpTitle}}",
+          "signature": {
+            "parameters": {},
+            "additionalParameters": "allowed"
+          }
+        }
+      }
+    }
+  },
+  "sap.ui": {
+    "technology": "UI5",
+    "icons": {
+      "icon": "",
+      "favIcon": "",
+      "phone": "",
+      "phone@2": "",
+      "tablet": "",
+      "tablet@2": ""
+    },
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  "sap.ui5": {
+    "flexEnabled": true,
+    "resourceRoots": {
+      "mathbasics": "extlib/src/csc/ui5lib/delegates/"
+    },a
+    "dependencies": {
+      "minUI5Version": "1.142.1",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "librarydest.i18n.i18n"
+        }
+      }
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/style.css"
+        }
+      ]
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "controlAggregation": "pages",
+        "controlId": "app",
+        "transition": "slide",
+        "type": "View",
+        "viewType": "XML",
+        "path": "librarydest.view",
+        "async": true,
+        "viewPath": "librarydest.view"
+      },
+      "routes": [
+        {
+          "name": "RouteMain",
+          "pattern": ":?query:",
+          "target": [
+            "TargetMain"
+          ]
+        }
+      ],
+      "targets": {
+        "TargetMain": {
+          "id": "Main",
+          "name": "Main"
+        }
+      }
+    },
+    "rootView": {
+      "viewName": "librarydest.view.App",
+      "type": "XML",
+      "id": "App",
+      "async": true
+    }
+  },
+  "sap.cloud": {
+    "public": true,
+    "service": "librarydest"
+  }
+}

@@ -1,0 +1,100 @@
+{
+  "namespace": "my.app",
+  "definitions": {
+    "my.app.Person": {
+      "kind": "entity",
+      "elements": {
+        "ID": {
+          "key": true,
+          "type": "cds.Integer"
+        },
+        "name": {
+          "type": "cds.String"
+        },
+        "age": {
+          "type": "cds.Integer"
+        },
+        "gender": {
+          "type": "cds.String"
+        }
+      }
+    },
+    "PersonService": {
+      "@source": "srv/service.cds",
+      "kind": "service"
+    },
+    "PersonService.People": {
+      "kind": "entity",
+      "projection": {
+        "from": {
+          "ref": [
+            "my.app.Person"
+          ]
+        }
+      },
+      "elements": {
+        "ID": {
+          "key": true,
+          "type": "cds.Integer"
+        },
+        "name": {
+          "type": "cds.String"
+        },
+        "age": {
+          "type": "cds.Integer"
+        },
+        "gender": {
+          "type": "cds.String"
+        }
+      }
+    },
+    "cds.outbox.Messages": {
+      "kind": "entity",
+      "elements": {
+        "ID": {
+          "key": true,
+          "type": "cds.UUID"
+        },
+        "timestamp": {
+          "type": "cds.Timestamp"
+        },
+        "target": {
+          "type": "cds.String"
+        },
+        "msg": {
+          "type": "cds.LargeString"
+        },
+        "attempts": {
+          "type": "cds.Integer",
+          "default": {
+            "val": 0
+          }
+        },
+        "partition": {
+          "type": "cds.Integer",
+          "default": {
+            "val": 0
+          }
+        },
+        "lastError": {
+          "type": "cds.LargeString"
+        },
+        "lastAttemptTimestamp": {
+          "@cds.on.update": {
+            "=": "$now"
+          },
+          "type": "cds.Timestamp"
+        },
+        "status": {
+          "type": "cds.String",
+          "length": 23
+        }
+      }
+    }
+  },
+  "meta": {
+    "creator": "CDS Compiler v6.4.6",
+    "flavor": "inferred"
+  },
+  "$version": "2.0"
+}

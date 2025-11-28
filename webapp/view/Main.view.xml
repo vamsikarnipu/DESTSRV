@@ -1,0 +1,28 @@
+<mvc:View controllerName="librarydest.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    xmlns="sap.m">
+     <Page
+		title="{i18n>appTitle}"
+		id="page">
+		<content>
+			<IllustratedMessage
+				title="{i18n>appTitle}"
+				illustrationType="sapIllus-SuccessHighFive"
+				enableVerticalResponsiveness="true"
+				description="{i18n>appDescription}">
+				<additionalContent>
+					<Button
+						id="helloButton"
+						text="{formatter: 'formatter.formatValue', path: 'i18n>btnText'}"
+						press="sayHello"
+						class="sapUiMediumMarginEnd" />
+					<Button
+						id="mathButton"
+						text="Test BasicMath Library"
+						press="onTestMath"
+						type="Emphasized" />
+				</additionalContent>
+			</IllustratedMessage>
+		</content>
+	</Page>
+</mvc:View>

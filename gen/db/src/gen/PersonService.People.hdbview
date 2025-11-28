@@ -1,0 +1,6 @@
+VIEW PersonService_People AS SELECT
+  Person_0.ID,
+  Person_0.name,
+  Person_0.age,
+  Person_0.gender
+FROM my_app_Person AS Person_0
