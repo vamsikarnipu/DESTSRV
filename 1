@@ -19,7 +19,7 @@ modules:
         parameters:
           service-key:
             name: librarydest-uaa-key
-      - name: servicedest-destination    # existing service, no content-target
+      - name: servicedest-destination      # existing service (no content-target)
     parameters:
       content:
         instance:
@@ -40,18 +40,19 @@ modules:
               ProxyType: Internet
               Authentication: NoAuthentication
               ServiceInstanceName: servicedest-destination
-              sap.cloud.service: servicedest
+              sap.cloud.service: librarydest    # FIXED
 
             - Name: CAP_BACKEND
               Type: HTTP
               ProxyType: Internet
               Authentication: NoAuthentication
               ServiceInstanceName: servicedest-destination
-              sap.cloud.service: servicedest
+              sap.cloud.service: librarydest    # FIXED
 
           existing_destinations_policy: update
     build-parameters:
       no-source: true
+
 
   - name: librarydest-app-content
     type: com.sap.application.content
@@ -67,6 +68,7 @@ modules:
             - librarydest.zip
           name: librarydest
           target-path: resources/
+
 
   - name: librarydest
     type: html5
