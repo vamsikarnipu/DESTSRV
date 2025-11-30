@@ -1,7 +1,7 @@
 _schema-version: "3.2"
 ID: librarydest
 version: 0.0.1
-description: UI5 App with external destination
+description: UI5 App with external destination consumption
 
 modules:
 
@@ -10,10 +10,11 @@ modules:
     type: html5
     path: .
     requires:
-      - name: librarydest-destination-service     # internal destination instance for ui5 tooling
-      - name: librarydest-repo-host              # HTML5 app repo host
-      - name: librarydest-uaa                    # xsuaa binding
-      - name: servicedest-destination            # <-- external destination (Amma/Nanna)
+      - name: librarydest-destination-service
+      - name: librarydest-repo-host
+      - name: librarydest-repo-runtime          # required for serving UI5 app
+      - name: librarydest-uaa
+      - name: servicedest-destination           # external destination (Amma/Nanna)
     build-parameters:
       build-result: dist
       builder: custom
@@ -22,7 +23,7 @@ modules:
         - npm run build:cf
       supported-platforms: []
 
-  # === HTML5 APP CONTENT (STATIC FILES) ===
+  # === STATIC CONTENT DEPLOYMENT INTO HTML5 APP REPO ===
   - name: librarydest-app-content
     type: com.sap.application.content
     path: .
@@ -40,7 +41,7 @@ modules:
 
 resources:
 
-  # === INTERNAL DESTINATION (MANDATORY FOR HTML5 RUNTIME) ===
+  # === INTERNAL DESTINATION SERVICE ===
   - name: librarydest-destination-service
     type: org.cloudfoundry.managed-service
     parameters:
@@ -60,7 +61,7 @@ resources:
             existing_destinations_policy: update
         version: 1.0.0
 
-  # === UAA SERVICE ===
+  # === UAA ===
   - name: librarydest-uaa
     type: org.cloudfoundry.managed-service
     parameters:
@@ -69,15 +70,23 @@ resources:
       service-name: librarydest-xsuaa-service
       path: ./xs-security.json
 
-  # === HTML5 REPO HOST ===
+  # === HTML5 APP REPOSITORY HOST ===
   - name: librarydest-repo-host
     type: org.cloudfoundry.managed-service
     parameters:
       service: html5-apps-repo
       service-plan: app-host
-      service-name: librarydest-html5-service
+      service-name: librarydest-html5-host
 
-  # === EXTERNAL DESTINATION SERVICE (Amma/Nanna) ===
+  # === HTML5 APP REPOSITORY RUNTIME (MANDATORY) ===
+  - name: librarydest-repo-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime
+      service-name: librarydest-html5-runtime
+
+  # === EXTERNAL DESTINATION SERVICE (Amma / Nanna) ===
   - name: servicedest-destination
     type: org.cloudfoundry.existing-service
     parameters:
