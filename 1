@@ -1,0 +1,880 @@
+# 🎯 **FINAL COMPLETE PROVIDER MTA WITH ALL CORRECTIONS**
+
+---
+
+## 📄 **Provider: mta.yaml** (FINAL VERSION)
+
+```yaml
+_schema-version: "3.3"
+ID: servicedest
+version: 1.0.1
+description: "CAP Provider with shared destinations for UI5 consumers"
+
+parameters:
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci
+        - npx cds build --production
+
+modules:
+  # ========================================
+  # CAP BACKEND SERVICE
+  # ========================================
+  - name: servicedest-srv
+    type: nodejs
+    path: gen/srv
+    parameters:
+      instances: 1
+      buildpack: nodejs_buildpack
+      memory: 512M
+      disk-quota: 1024M
+    build-parameters:
+      builder: npm
+    provides:
+      - name: srv-api
+        properties:
+          srv-url: ${default-url}
+    requires:
+      - name: servicedest-destination
+
+  # ========================================
+  # APP ROUTER (OPTIONAL - can be removed)
+  # ========================================
+  - name: servicedest-router
+    type: approuter.nodejs
+    path: app/router
+    parameters:
+      keep-existing-routes: true
+      disk-quota: 256M
+      memory: 256M
+    provides:
+      - name: app-api
+        properties:
+          app-protocol: ${protocol}
+          app-uri: ${default-uri}
+    requires:
+      - name: srv-api
+        group: destinations
+        properties:
+          name: srv-api
+          url: ~{srv-url}
+          forwardAuthToken: true
+      - name: servicedest-destination
+      - name: servicedest-uaa
+
+  # ========================================
+  # UAA (if using App Router)
+  # ========================================
+  - name: servicedest-uaa-config
+    type: com.sap.application.content
+    requires:
+      - name: servicedest-uaa
+        parameters:
+          service-key:
+            name: servicedest-uaa-key
+    build-parameters:
+      no-source: true
+
+resources:
+  # ========================================
+  # SHARED DESTINATION SERVICE
+  # (For ALL consumers)
+  # ========================================
+  - name: servicedest-destination
+    type: org.cloudfoundry.managed-service
+    requires:
+      - name: srv-api
+      - name: app-api
+    parameters:
+      service: destination
+      service-plan: lite
+      service-name: servicedest-destination
+      config:
+        HTML5Runtime_enabled: true
+        init_data:
+          instance:
+            destinations:
+              # ===========================
+              # UI5 LIBRARIES DESTINATION
+              # ===========================
+              - Name: ui5
+                Type: HTTP
+                ProxyType: Internet
+                Authentication: NoAuthentication
+                URL: https://ui5.sap.com
+                HTML5.DynamicDestination: true
+                WebIDEEnabled: true
+                WebIDEUsage: ui5_libs
+                Description: SAPUI5 Libraries CDN
+
+              # ===========================
+              # CAP BACKEND DESTINATION
+              # ===========================
+              - Name: CAP_BACKEND
+                Type: HTTP
+                ProxyType: Internet
+                Authentication: NoAuthentication
+                URL: ~{srv-api/srv-url}
+                HTML5.DynamicDestination: true
+                WebIDEEnabled: true
+                Description: CAP OData Backend Service
+
+              # ===========================
+              # APP ROUTER DESTINATION (optional)
+              # ===========================
+              - Name: APP_ROUTER
+                Type: HTTP
+                ProxyType: Internet
+                Authentication: NoAuthentication
+                URL: ~{app-api/app-uri}
+                HTML5.DynamicDestination: true
+                WebIDEEnabled: true
+                Description: Application Router
+
+            existing_destinations_policy: update
+        version: 1.0.0
+
+  # ========================================
+  # UAA SERVICE (if using App Router)
+  # ========================================
+  - name: servicedest-uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: servicedest-uaa
+      path: ./xs-security.json
+      config:
+        xsappname: servicedest-${org}-${space}
+        tenant-mode: dedicated
+```
+
+---
+
+## 📁 **Provider: Complete File Structure**
+
+```
+servicedest/                          (Provider CAP Project)
+├── mta.yaml                          ← Above file
+├── package.json
+├── xs-security.json                  ← If using App Router
+│
+├── app/
+│   └── router/                       ← Optional App Router
+│       ├── package.json
+│       └── xs-app.json
+│
+├── srv/
+│   ├── service.cds
+│   └── service.js
+│
+├── db/
+│   └── schema.cds
+│
+└── gen/                              ← Generated by cds build
+    └── srv/
+```
+
+---
+
+## 📄 **Provider: xs-security.json** (if using App Router)
+
+```json
+{
+  "xsappname": "servicedest",
+  "tenant-mode": "dedicated",
+  "description": "Security descriptor for servicedest",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Admin",
+      "description": "Admin scope"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "Admin",
+      "description": "Admin role",
+      "scope-references": [
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "ServiceDest_Admin",
+      "description": "Service Destination Administrator",
+      "role-template-references": [
+        "$XSAPPNAME.Admin"
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 📄 **Provider: app/router/package.json**
+
+```json
+{
+  "name": "servicedest-router",
+  "version": "1.0.1",
+  "description": "App Router for servicedest",
+  "scripts": {
+    "start": "node node_modules/@sap/approuter/approuter.js"
+  },
+  "dependencies": {
+    "@sap/approuter": "^14"
+  },
+  "engines": {
+    "node": "^18 || ^20"
+  }
+}
+```
+
+---
+
+## 📄 **Provider: app/router/xs-app.json**
+
+```json
+{
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "route",
+  "logout": {
+    "logoutEndpoint": "/do/logout"
+  },
+  "routes": [
+    {
+      "source": "^/odata/v4/(.*)$",
+      "target": "/odata/v4/$1",
+      "destination": "srv-api",
+      "authenticationType": "xsuaa",
+      "csrfProtection": true
+    },
+    {
+      "source": "^/(.*)$",
+      "target": "$1",
+      "authenticationType": "xsuaa"
+    }
+  ]
+}
+```
+
+---
+
+## 📄 **Provider: package.json** (root)
+
+```json
+{
+  "name": "servicedest",
+  "version": "1.0.1",
+  "description": "CAP Provider Service",
+  "repository": "<Add your repository here>",
+  "license": "UNLICENSED",
+  "private": true,
+  "dependencies": {
+    "@sap/cds": "^7",
+    "express": "^4"
+  },
+  "devDependencies": {
+    "@cap-js/sqlite": "^1",
+    "@sap/cds-dk": "^7"
+  },
+  "scripts": {
+    "start": "cds-serve",
+    "watch": "cds watch",
+    "build": "cds build --production"
+  },
+  "cds": {
+    "requires": {
+      "db": {
+        "kind": "sql"
+      }
+    }
+  }
+}
+```
+
+---
+
+# 📱 **CONSUMER: FINAL FILES**
+
+---
+
+## 📄 **Consumer: mta.yaml** (FINAL VERSION)
+
+```yaml
+_schema-version: "3.3"
+ID: librarydest
+version: 0.0.1
+description: "UI5 Consumer App using shared destinations"
+
+parameters:
+  deploy_mode: html5-repo
+  enable-parallel-deployments: true
+
+build-parameters:
+  before-all:
+    - builder: custom
+      commands:
+        - npm ci --production
+
+modules:
+  # ========================================
+  # UI5 APPLICATION MODULE
+  # ========================================
+  - name: librarydest-ui
+    type: html5
+    path: .
+    build-parameters:
+      builder: custom
+      commands:
+        - npm ci
+        - npm run build:cf
+      supported-platforms: []
+      build-result: dist
+    requires:
+      - name: librarydest-uaa
+      - name: librarydest-html5-runtime
+      - name: servicedest-destination        # ← External destination service
+
+  # ========================================
+  # DEPLOYER MODULE
+  # ========================================
+  - name: librarydest-deployer
+    type: com.sap.application.content
+    path: .
+    requires:
+      - name: librarydest-html5-host
+        parameters:
+          content-target: true
+    build-parameters:
+      build-result: resources
+      requires:
+        - name: librarydest-ui
+          artifacts:
+            - dist
+          target-path: resources/
+
+resources:
+  # ========================================
+  # HTML5 REPOSITORY - HOST
+  # ========================================
+  - name: librarydest-html5-host
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-host
+      service-name: librarydest-html5-host
+
+  # ========================================
+  # HTML5 REPOSITORY - RUNTIME (Managed AppRouter)
+  # ========================================
+  - name: librarydest-html5-runtime
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: html5-apps-repo
+      service-plan: app-runtime
+      service-name: librarydest-html5-runtime
+
+  # ========================================
+  # XSUAA
+  # ========================================
+  - name: librarydest-uaa
+    type: org.cloudfoundry.managed-service
+    parameters:
+      service: xsuaa
+      service-plan: application
+      service-name: librarydest-xsuaa-service
+      path: ./xs-security.json
+      config:
+        xsappname: librarydest-${org}-${space}
+        tenant-mode: dedicated
+
+  # ========================================
+  # EXTERNAL DESTINATION SERVICE FROM PROVIDER
+  # (Contains: ui5, CAP_BACKEND, APP_ROUTER)
+  # ========================================
+  - name: servicedest-destination
+    type: org.cloudfoundry.existing-service
+    parameters:
+      service-name: servicedest-destination
+```
+
+---
+
+## 📁 **Consumer: Complete File Structure**
+
+```
+librarydest/                          (Consumer UI5 Project)
+├── mta.yaml                          ← Above file
+├── package.json
+├── xs-app.json                       ← Routing rules
+├── xs-security.json                  ← UAA config
+├── ui5.yaml                          ← UI5 tooling
+├── ui5-local.yaml                    ← Local dev config
+│
+├── webapp/
+│   ├── index.html
+│   ├── manifest.json
+│   ├── Component.js
+│   │
+│   ├── controller/
+│   │   └── Main.controller.js
+│   │
+│   ├── view/
+│   │   └── Main.view.xml
+│   │
+│   ├── model/
+│   │   └── models.js
+│   │
+│   ├── css/
+│   │   └── style.css
+│   │
+│   └── i18n/
+│       ├── i18n.properties
+│       └── i18n_en.properties
+│
+├── resources/                        ← Created by deployer
+├── dist/                             ← Created by ui5 build
+└── mta_archives/                     ← Created by mbt build
+```
+
+---
+
+## 📄 **Consumer: xs-app.json**
+
+```json
+{
+  "welcomeFile": "/index.html",
+  "authenticationMethod": "route",
+  "logout": {
+    "logoutEndpoint": "/do/logout"
+  },
+  "routes": [
+    {
+      "source": "^/backend/(.*)$",
+      "target": "/$1",
+      "destination": "CAP_BACKEND",
+      "authenticationType": "xsuaa",
+      "csrfProtection": false
+    },
+    {
+      "source": "^/resources/(.*)$",
+      "target": "/resources/$1",
+      "destination": "ui5",
+      "authenticationType": "none"
+    },
+    {
+      "source": "^/test-resources/(.*)$",
+      "target": "/test-resources/$1",
+      "destination": "ui5",
+      "authenticationType": "none"
+    },
+    {
+      "source": "^/(.*)$",
+      "target": "$1",
+      "service": "html5-apps-repo-rt",
+      "authenticationType": "xsuaa"
+    }
+  ]
+}
+```
+
+---
+
+## 📄 **Consumer: xs-security.json**
+
+```json
+{
+  "xsappname": "librarydest",
+  "tenant-mode": "dedicated",
+  "description": "Security descriptor for librarydest UI5 app",
+  "scopes": [
+    {
+      "name": "$XSAPPNAME.Display",
+      "description": "Display content"
+    }
+  ],
+  "role-templates": [
+    {
+      "name": "Viewer",
+      "description": "View application content",
+      "scope-references": [
+        "$XSAPPNAME.Display"
+      ]
+    }
+  ],
+  "role-collections": [
+    {
+      "name": "LibraryDest_Viewer",
+      "description": "Library Destination Viewer",
+      "role-template-references": [
+        "$XSAPPNAME.Viewer"
+      ]
+    }
+  ]
+}
+```
+
+---
+
+## 📄 **Consumer: package.json**
+
+```json
+{
+  "name": "librarydest",
+  "version": "0.0.1",
+  "description": "UI5 Consumer Application",
+  "scripts": {
+    "start": "ui5 serve --port 8080",
+    "build": "ui5 build --clean-dest",
+    "build:cf": "ui5 build --clean-dest --dest dist",
+    "deploy": "cf deploy mta_archives/librarydest_0.0.1.mtar",
+    "undeploy": "cf undeploy librarydest --delete-services"
+  },
+  "devDependencies": {
+    "@sap/ux-ui5-tooling": "^1",
+    "@ui5/cli": "^3",
+    "@sap/ui5-builder-webide-extension": "^1.1"
+  },
+  "ui5": {
+    "dependencies": [
+      "@sap/ui5-builder-webide-extension"
+    ]
+  }
+}
+```
+
+---
+
+## 📄 **Consumer: ui5.yaml**
+
+```yaml
+specVersion: '3.0'
+metadata:
+  name: librarydest
+type: application
+
+framework:
+  name: SAPUI5
+  version: "1.120.0"
+  libraries:
+    - name: sap.m
+    - name: sap.ui.core
+    - name: sap.ui.layout
+    - name: sap.ui.unified
+    - name: themelib_sap_horizon
+
+server:
+  customMiddleware:
+    - name: fiori-tools-proxy
+      afterMiddleware: compression
+      configuration:
+        backend:
+          - path: /backend
+            url: http://localhost:4004
+            destination: CAP_BACKEND
+        ui5:
+          path:
+            - /resources
+            - /test-resources
+          url: https://ui5.sap.com
+          
+    - name: fiori-tools-appreload
+      afterMiddleware: compression
+      configuration:
+        port: 35729
+        path: webapp
+        delay: 300
+
+    - name: sap-fe-mockserver
+      beforeMiddleware: csp
+      configuration:
+        mountPath: /
+        services:
+          - urlPath: /backend/odata/v4/catalog
+            metadataPath: ./webapp/localService/metadata.xml
+            mockdataPath: ./webapp/localService/data
+            generateMockData: true
+```
+
+---
+
+## 📄 **Consumer: ui5-local.yaml** (for local development)
+
+```yaml
+specVersion: '3.0'
+metadata:
+  name: librarydest
+type: application
+
+server:
+  customMiddleware:
+    - name: fiori-tools-proxy
+      afterMiddleware: compression
+      configuration:
+        backend:
+          - path: /backend
+            url: http://localhost:4004
+        ui5:
+          path:
+            - /resources
+            - /test-resources
+          url: https://ui5.sap.com
+```
+
+---
+
+## 📄 **Consumer: webapp/index.html**
+
+```html
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    
+    <title>Library Destination App</title>
+
+    <!-- Load UI5 from destination 'ui5' -->
+    <script
+        id="sap-ui-bootstrap"
+        src="resources/sap-ui-core.js"
+        data-sap-ui-theme="sap_horizon"
+        data-sap-ui-resourceroots='{
+            "librarydest": "./"
+        }'
+        data-sap-ui-oninit="module:sap/ui/core/ComponentSupport"
+        data-sap-ui-libs="sap.m, sap.ui.core"
+        data-sap-ui-compatVersion="edge"
+        data-sap-ui-async="true"
+        data-sap-ui-frameOptions="trusted"
+        data-sap-ui-bindingSyntax="complex">
+    </script>
+</head>
+<body class="sapUiBody" id="content">
+    <div
+        data-sap-ui-component
+        data-name="librarydest"
+        data-id="container"
+        data-settings='{"id" : "librarydest"}'
+        data-handle-validation="true">
+    </div>
+</body>
+</html>
+```
+
+---
+
+## 📄 **Consumer: webapp/manifest.json**
+
+```json
+{
+  "_version": "1.59.0",
+  "sap.app": {
+    "id": "librarydest",
+    "type": "application",
+    "i18n": "i18n/i18n.properties",
+    "applicationVersion": {
+      "version": "0.0.1"
+    },
+    "title": "{{appTitle}}",
+    "description": "{{appDescription}}",
+    "dataSources": {
+      "mainService": {
+        "uri": "/backend/odata/v4/catalog/",
+        "type": "OData",
+        "settings": {
+          "odataVersion": "4.0",
+          "localUri": "localService/metadata.xml"
+        }
+      }
+    }
+  },
+  
+  "sap.ui": {
+    "technology": "UI5",
+    "deviceTypes": {
+      "desktop": true,
+      "tablet": true,
+      "phone": true
+    }
+  },
+  
+  "sap.ui5": {
+    "flexEnabled": true,
+    "dependencies": {
+      "minUI5Version": "1.120.0",
+      "libs": {
+        "sap.m": {},
+        "sap.ui.core": {},
+        "sap.ui.layout": {}
+      }
+    },
+    "contentDensities": {
+      "compact": true,
+      "cozy": true
+    },
+    "models": {
+      "i18n": {
+        "type": "sap.ui.model.resource.ResourceModel",
+        "settings": {
+          "bundleName": "librarydest.i18n.i18n"
+        }
+      },
+      "": {
+        "dataSource": "mainService",
+        "preload": true,
+        "settings": {
+          "synchronizationMode": "None",
+          "operationMode": "Server",
+          "autoExpandSelect": true,
+          "earlyRequests": true
+        }
+      }
+    },
+    "resources": {
+      "css": [
+        {
+          "uri": "css/style.css"
+        }
+      ]
+    },
+    "routing": {
+      "config": {
+        "routerClass": "sap.m.routing.Router",
+        "viewType": "XML",
+        "async": true,
+        "viewPath": "librarydest.view",
+        "controlAggregation": "pages",
+        "controlId": "app",
+        "clearControlAggregation": false
+      },
+      "routes": [
+        {
+          "name": "RouteMain",
+          "pattern": ":?query:",
+          "target": [
+            "TargetMain"
+          ]
+        }
+      ],
+      "targets": {
+        "TargetMain": {
+          "viewType": "XML",
+          "transition": "slide",
+          "clearControlAggregation": false,
+          "viewId": "Main",
+          "viewName": "Main"
+        }
+      }
+    },
+    "rootView": {
+      "viewName": "librarydest.view.App",
+      "type": "XML",
+      "async": true,
+      "id": "app"
+    }
+  }
+}
+```
+
+---
+
+## 📄 **Consumer: webapp/Component.js**
+
+```javascript
+sap.ui.define([
+    "sap/ui/core/UIComponent",
+    "sap/ui/model/json/JSONModel",
+    "librarydest/model/models"
+], function (UIComponent, JSONModel, models) {
+    "use strict";
+
+    return UIComponent.extend("librarydest.Component", {
+        metadata: {
+            manifest: "json"
+        },
+
+        init: function () {
+            // call the base component's init function
+            UIComponent.prototype.init.apply(this, arguments);
+
+            // set the device model
+            this.setModel(models.createDeviceModel(), "device");
+
+            // enable routing
+            this.getRouter().initialize();
+        }
+    });
+});
+```
+
+---
+
+## 📄 **Consumer: webapp/view/App.view.xml**
+
+```xml
+<mvc:View
+    controllerName="librarydest.controller.App"
+    xmlns:mvc="sap.ui.core.mvc"
+    displayBlock="true"
+    xmlns="sap.m">
+    <App id="app">
+    </App>
+</mvc:View>
+```
+
+---
+
+## 📄 **Consumer: webapp/view/Main.view.xml**
+
+```xml
+<mvc:View
+    controllerName="librarydest.controller.Main"
+    xmlns:mvc="sap.ui.core.mvc"
+    displayBlock="true"
+    xmlns="sap.m">
+    
+    <Page id="page" title="{i18n>title}">
+        <content>
+            <VBox class="sapUiSmallMargin">
+                <Title text="UI5 Consumer App" level="H2"/>
+                <Text text="This app consumes destinations from the Provider service:"/>
+                <List
+                    headerText="Available Destinations"
+                    items="{
+                        path: '/destinations'
+                    }">
+                    <StandardListItem
+                        title="{name}"
+                        description="{url}"
+                        icon="sap-icon://chain-link"/>
+                </List>
+                
+                <Button
+                    text="Test CAP Backend"
+                    press=".onTestBackend"
+                    type="Emphasized"
+                    class="sapUiTinyMarginTop"/>
+            </VBox>
+        </content>
+    </Page>
+</mvc:View>
+```
+
+---
+
+## 📄 **Consumer: webapp/controller/Main.controller.js**
+
+```javascript
+sap.ui.define([
+    "sap/ui/core/mvc/Controller",
+    "sap/m/MessageToast",
+    "sap/ui/model/json/JSONModel
